@@ -137,9 +137,9 @@ Amp\delay(5);
 print '++ Script end' . PHP_EOL;
 ```
 
-While `Amp\async()` starts a single coroutine, `Amp\concurrent()` starts one per closure, returning a `Future` for each
-with the array keys preserved. Pipe or pass the result into a combinator such as `Amp\Future\await()` or
-`Amp\Future\settle()` to await the values.
+The example above runs a single coroutine alongside the main flow. To start several at once, `Amp\concurrent()`
+applies `Amp\async()` to each closure in an array, returning a `Future` for each with the keys preserved. Pass or
+pipe those futures into a combinator such as `Amp\Future\await()` or `Amp\Future\settle()` to await all the results:
 
 ```php
 use function Amp\concurrent;

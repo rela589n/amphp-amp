@@ -137,6 +137,20 @@ Amp\delay(5);
 print '++ Script end' . PHP_EOL;
 ```
 
+While `Amp\async()` starts a single coroutine, `Amp\concurrent()` starts one per closure, returning a `Future` for each
+with the array keys preserved. Pipe or pass the result into a combinator such as `Amp\Future\await()` or
+`Amp\Future\settle()` to await the values.
+
+```php
+use function Amp\concurrent;
+use function Amp\Future\await;
+
+[$property, $photos] = concurrent([
+    fn () => $dataService->findProperty($id),
+    fn () => $dataService->findPropertyPhotos($id),
+]) |> await(...);
+```
+
 ### Future
 
 A `Future` is an object representing the eventual result of an asynchronous operation. Such placeholders are also
@@ -277,6 +291,34 @@ individual keys in the component array are preserved from the `iterable` passed 
 ##### awaitAll
 
 `Amp\Future\awaitAll($iterable, $cancellation)` awaits all futures and returns their results as `[$errors, $values]` array.
+
+##### settle
+
+`Amp\Future\settle($iterable, $cancellation)` waits for all futures to finish (either successfully resolve or reject),
+throwing a `CompositeException` with all the errors in case of rejection.
+
+```php
+use Amp\CompositeException;
+use function Amp\concurrent;
+use function Amp\Future\settle;
+
+// health checks
+try {
+    return new JsonResponse(concurrent([
+      'db'      => fn () => $pool->ping() ?? 'OK',
+      'redis'   => fn () => $cache->ping() ?? 'OK',
+      'broker'  => fn () => $amqp->ping() ?? 'OK',
+      'secrets' => fn () => $vault->ping() ?? 'OK',
+    ]) |> settle(...), HTTP_OK);
+} catch (CompositeException $e) {
+    $unavailableServices = array_map(
+        static fn (Throwable $exception) => (string) $exception,
+        $e->getReasons(), // already ['redis' => …, 'broker' => …]
+    );
+
+    return new JsonResponse($unavailableServices, HTTP_SERVICE_UNAVAILABLE);
+}
+```
 
 ##### awaitFirst
 

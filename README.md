@@ -282,9 +282,38 @@ try {
 
 ##### awaitAnyN
 
-`Amp\Future\awaitAnyN($count, $iterable, $cancellation)` is the same as `await()` except that it tolerates individual errors. A result is returned once
-exactly `$count` instances in the `iterable` complete successfully. The return value is an array of values. The
-individual keys in the component array are preserved from the `iterable` passed to the function for evaluation.
+`Amp\Future\awaitAnyN($count, $iterable, $cancellation)` is the same as `await()` except that it tolerates individual errors.
+A result is returned once exactly `$count` instances in the `iterable` complete successfully, or `CompositeException` is thrown otherwise.
+The return value is an array of values with the individual keys preserved from the `iterable` passed to the function for evaluation.
+
+##### settle
+
+`Amp\Future\settle($iterable, $cancellation)` is the same as `await()` except that it waits for all the futures to finish (either successfully complete or error),
+not failing right off with the first error.
+
+A result is returned only if all the futures complete successfully.
+If at least one of them errors, a `CompositeException` comprised of all the errors is thrown.
+
+```php
+use Amp\CompositeException;
+use function Amp\concurrent;
+use function Amp\Future\settle;
+
+try {
+    $services = [
+        'db' => fn () => $pool->connect(),
+        'redis' => fn () => $cache->connect(),
+        'broker' => fn () => $amqp->connect(),
+        'secrets' => fn () => $vault->connect(),
+    ] |> concurrent(...) |> settle(...);
+} catch (CompositeException $e) {
+    $failedServices = array_keys($e->getReasons());
+    $message = sprintf('Services connection failed: %s.', implode(', ', $failedServices));
+
+    // Services connection failed: redis, broker.
+    throw new ServicesConnectionFailedException($message, $e->getReasons());
+}
+```
 
 ##### awaitAll
 
